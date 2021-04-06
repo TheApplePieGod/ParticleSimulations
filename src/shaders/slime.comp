@@ -1,0 +1,113 @@
+#version 450
+
+layout(local_size_x = 64, local_size_y = 1, local_size_z = 1) in;
+
+struct agent
+{
+    vec2 position;
+    float angle;
+    float padding;
+};
+
+layout(push_constant) uniform PushConstants {
+    int numAgents;
+    float moveSpeed;
+    float diffuseSpeed;
+    float evaporateSpeed;
+    float turnSpeed;
+    float deltaTime;
+} constants;
+
+layout(set = 0, binding = 0, std430) buffer AgentData
+{
+    agent agents[];
+} agentData;
+
+layout(set = 0, binding = 1, rgba8) uniform image2D image;
+
+// max val: 4294967295.0
+uint hash(uint state)
+{
+    state ^= 2747636419u;
+    state *= 2654435769u;
+    state ^= state >> 16;
+    state *= 2654435769u;
+    state ^= state >> 16;
+    state *= 2654435769u;
+    return state;
+}
+
+float clampHash(uint hash)
+{
+    return hash / 4294967295.0;
+}
+
+float sense(agent entry, float angleOffset, uvec2 size)
+{
+    float offsetDistance = 30.0;
+    int sensorSize = 1;
+
+    float angle = entry.angle + angleOffset;
+    vec2 sensorDir = vec2(cos(angle), sin(angle));
+    ivec2 sensorCenter = ivec2(entry.position + sensorDir * offsetDistance);
+    
+    float sum = 0;
+    for (int offsetX = -sensorSize; offsetX <= sensorSize; offsetX++)
+    {
+        for (int offsetY = -sensorSize; offsetY <= sensorSize; offsetY++)
+        {
+            ivec2 pos = sensorCenter + ivec2(offsetX, offsetY);
+
+            if (pos.x >= 0 && pos.x < size.x && pos.y >= 0 && pos.y < size.y)
+            {
+                sum += imageLoad(image, pos).r;
+            }
+        }
+    }
+
+    return sum;
+}
+
+void main()
+{
+    uint id = gl_GlobalInvocationID.x;
+    if (id >= constants.numAgents) return;
+    uvec2 size = uvec2(imageSize(image));
+
+    agent entry = agentData.agents[id];
+    uint randomNumber = hash(uint(entry.position.y) * size.x + uint(entry.position.x) + hash(id));
+
+    // steer
+    float angleOffset = 3.1415926 / 6.0;
+    float weightForward = sense(entry, 0, size);
+    float weightLeft = sense(entry, angleOffset, size);
+    float weightRight = sense(entry,- angleOffset, size);
+
+    float randomSteerStrength = clampHash(randomNumber);
+    if (weightForward < weightLeft && weightForward < weightRight) // turn randomly
+        agentData.agents[id].angle += (randomSteerStrength - 0.5) * 2 * constants.turnSpeed * constants.deltaTime;
+    else if (weightRight > weightLeft) // turn right
+        agentData.agents[id].angle -= randomSteerStrength * constants.turnSpeed * constants.deltaTime;
+    else if (weightLeft > weightRight) // turn left
+        agentData.agents[id].angle += randomSteerStrength * constants.turnSpeed * constants.deltaTime;
+
+    // move
+    vec2 direction = vec2(cos(agentData.agents[id].angle), sin(agentData.agents[id].angle));
+    vec2 newPos = entry.position + direction * constants.moveSpeed * constants.deltaTime;
+
+    // clamp to map boundaries and pick a new angle if on edge
+    if (newPos.x < 0 || newPos.x >= size.x || newPos.y < 0 || newPos.y >= size.y)
+    {
+        newPos.x = min(size.x - 0.01, max(0, newPos.x));
+        newPos.y = min(size.y - 0.01, max(0, newPos.y));
+        agentData.agents[id].angle = randomSteerStrength * 2 * 3.1415926535;
+    }
+    else
+    {
+        //vec3 oldColor = imageLoad(image, ivec2(newPos)).rgb;
+        //imageStore(image, ivec2(newPos), vec4(min(vec3(1.0), oldColor + 50.0 * constants.deltaTime), 1.0));
+        imageStore(image, ivec2(newPos), vec4(1.f, 1.f, 1.f, 1.f));
+    }
+
+    agentData.agents[id].position = newPos;
+}
