@@ -8,7 +8,13 @@ layout(push_constant) uniform PushConstants {
     float diffuseSpeed;
     float evaporateSpeed;
     float turnSpeed;
+    float sensorOffset;
+    float sensorAngle;
+    int sensorSize;
     float deltaTime;
+    bool dirty;
+    vec2 padding;
+    vec4 color;
 } constants;
 
 layout(set = 0, binding = 0, rgba8) uniform image2D image;
@@ -17,10 +23,16 @@ void main()
 {   uvec2 size = uvec2(imageSize(image));
     if (gl_GlobalInvocationID.x < 0 || gl_GlobalInvocationID.x >= size.x || gl_GlobalInvocationID.y < 0 || gl_GlobalInvocationID.y >= size.y) return;
 
-    vec3 originalValue = imageLoad(image, ivec2(gl_GlobalInvocationID.xy)).rgb;
+    if (constants.dirty)
+    {
+        imageStore(image, ivec2(gl_GlobalInvocationID.xy), vec4(0));
+        return;
+    }
+
+    vec4 originalValue = imageLoad(image, ivec2(gl_GlobalInvocationID.xy));
 
     // simulate blur
-    vec3 sum = vec3(0);
+    vec4 sum = vec4(0);
     for (int offsetX = -1; offsetX <= 1; offsetX++)
     {
         for (int offsetY = -1; offsetY <= 1; offsetY++)
@@ -30,15 +42,15 @@ void main()
 
             if (sampleX >= 0 && sampleX < size.x && sampleY >= 0 && sampleY < size.y)
             {
-                sum += imageLoad(image, ivec2(sampleX, sampleY)).rgb;
+                sum += imageLoad(image, ivec2(sampleX, sampleY));
             }
         }
     }
-    vec3 blurResult = sum / 9.0;
+    vec4 blurResult = sum / 9.0;
 
     float diffuseWeight = clamp(constants.diffuseSpeed * constants.deltaTime, 0.0, 1.0);
     blurResult = originalValue * (1 - diffuseWeight) + blurResult * diffuseWeight;
-    imageStore(image, ivec2(gl_GlobalInvocationID.xy), vec4(max(vec3(0), blurResult - constants.evaporateSpeed * constants.deltaTime), 1.0));
+    imageStore(image, ivec2(gl_GlobalInvocationID.xy), max(vec4(0), blurResult - constants.evaporateSpeed * constants.deltaTime));
 
     //vec3 diffusedValue = mix(originalValue, blurResult, constants.diffuseSpeed * constants.deltaTime);
     //vec3 evaporatedValue = max(vec3(0.0), diffusedValue - constants.evaporateSpeed * constants.deltaTime);
