@@ -147,7 +147,7 @@ void simulation_slime::StartAgentsFromCenter()
         agentData[i].position = glm::vec2(imageSizeX / 2.f, imageSizeY / 2.f);
         agentData[i].angle = (rand() / static_cast<f32>(RAND_MAX)) * Pi32 * 2;
     }
-    Engine->MapComputeData(0, 0, 0, sizeof(slime_agent) * agentCount, agentData.data()); // map inital data
+    Engine->MapComputeData(slimeComputeIndex, 0, 0, sizeof(slime_agent) * agentCount, agentData.data()); // map inital data
 }
 
 void simulation_slime::StartAgentsFromOutside()
@@ -160,5 +160,5 @@ void simulation_slime::StartAgentsFromOutside()
         agentData[i].position = glm::vec2(imageSizeX / 2.f, imageSizeY / 2.f) + angleVec * (0.5f * (rand() % imageSizeY));
         agentData[i].angle = angle + Pi32;
     }
-    Engine->MapComputeData(0, 0, 0, sizeof(slime_agent) * agentCount, agentData.data()); // map inital data
+    Engine->MapComputeData(slimeComputeIndex, 0, 0, sizeof(slime_agent) * agentCount, agentData.data()); // map inital data
 }

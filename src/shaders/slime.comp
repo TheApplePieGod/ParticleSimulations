@@ -29,7 +29,7 @@ layout(set = 0, binding = 0, std430) buffer AgentData
     agent agents[];
 } agentData;
 
-layout(set = 0, binding = 1, rgba8) uniform image2D image;
+layout(set = 0, binding = 1, rgba32f) uniform image2D image;
 
 // max val: 4294967295.0
 uint hash(uint state)
