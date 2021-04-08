@@ -1,0 +1,106 @@
+#version 450
+
+layout(local_size_x = 64, local_size_y = 1, local_size_z = 1) in;
+
+struct cell
+{
+    vec2 position;
+    vec2 velocity;
+    vec2 force;
+    float density;
+    float pressure;
+};
+
+layout(push_constant) uniform PushConstants {
+    int numParticles;
+    float viscosity;
+    float mass;
+    float radius;
+    float wallDamping;
+    float density;
+    float stiffness;
+    float deltaTime;
+    float dragSpeed;
+    int colliderIndex;
+    bool dirty;
+} constants;
+
+layout(set = 0, binding = 0, std430) buffer CellData
+{
+    cell cells[];
+} data;
+
+layout(set = 0, binding = 1, std430) buffer ForceInputs
+{
+    vec4 forces[];
+} inputs;
+
+void main()
+{
+    uint id = gl_GlobalInvocationID.x;
+    if (id >= constants.numParticles) return;
+
+    // integrate
+    float dt = 0.01 * constants.deltaTime;
+    vec2 acceleration = (data.cells[id].force + inputs.forces[id].xy) / data.cells[id].density;
+    vec2 newVelocity = data.cells[id].velocity + dt * acceleration;
+    vec2 finalMovement = dt * newVelocity;
+
+    vec2 newPosition = data.cells[id].position;
+    newPosition.x += finalMovement.x;
+
+    bool collideX = ( // wall boundaries
+        newPosition.x < -1 ||
+        newPosition.x > 1
+    ) || ( // obstacles
+        (constants.colliderIndex == 1 && newPosition.x < 0.5 && newPosition.x > -0.5 && newPosition.y < 0.4 && newPosition.y > 0.3) ||
+        (constants.colliderIndex == 2 && newPosition.x < 0.9 && newPosition.x > -0.9 && newPosition.y < 0.4 && newPosition.y > 0.3) ||
+        (constants.colliderIndex == 3 && newPosition.x < -0.1 && newPosition.x > -1 && newPosition.y < 0.5 && newPosition.y > 0.4) ||
+        (constants.colliderIndex == 3 && newPosition.x < 1 && newPosition.x > 0.1 && newPosition.y < 0.5 && newPosition.y > 0.4) ||
+        (constants.colliderIndex == 4 && newPosition.x < 0.1 && newPosition.x > -0.1 && newPosition.y < 0.6 && newPosition.y > -0.6)
+    );
+
+    if (collideX)
+    {
+        newPosition.x -= finalMovement.x;
+        newVelocity.x *= -1 * constants.wallDamping;
+    }
+
+    newPosition.y += finalMovement.y;
+
+    bool collideY = ( // wall boundaries
+        newPosition.y < -1 ||
+        newPosition.y > 1
+    ) || ( // obstacles
+        (constants.colliderIndex == 1 && newPosition.x < 0.5 && newPosition.x > -0.5 && newPosition.y < 0.4 && newPosition.y > 0.3) ||
+        (constants.colliderIndex == 2 && newPosition.x < 0.9 && newPosition.x > -0.9 && newPosition.y < 0.4 && newPosition.y > 0.3) ||
+        (constants.colliderIndex == 3 && newPosition.x < -0.1 && newPosition.x > -1 && newPosition.y < 0.5 && newPosition.y > 0.4) ||
+        (constants.colliderIndex == 3 && newPosition.x < 1 && newPosition.x > 0.1 && newPosition.y < 0.5 && newPosition.y > 0.4) ||
+        (constants.colliderIndex == 4 && newPosition.x < 0.1 && newPosition.x > -0.1 && newPosition.y < 0.6 && newPosition.y > -0.6)
+    );
+
+    if (collideY)
+    {
+        newPosition.y -= finalMovement.y;
+        newVelocity.y *= -1 * constants.wallDamping;
+    }
+
+    // bool inY = newPosition.y < 0.5 && newPosition.y > 0.4;
+    // bool inX = newPosition.x < 0.5 && newPosition.x > -0.5;
+    // if (inY && inX)
+    // {
+    //     newPosition.y = data.cells[id].position.y;
+    //     newVelocity.y *= -1 * constants.wallDamping;
+    //     newPosition.x = data.cells[id].position.x;
+    //     newVelocity.x *= -1 * constants.wallDamping;
+    // }
+    // if ()
+    // {
+    //     newPosition.x = data.cells[id].position.x;
+    //     newVelocity.x *= -1 * constants.wallDamping;
+    // }
+
+    data.cells[id].velocity = newVelocity;
+    data.cells[id].position = newPosition;
+    inputs.forces[id] = vec4(0.0);
+}

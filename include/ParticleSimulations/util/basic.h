@@ -14,11 +14,15 @@ typedef double d64;
 
 #define Pi32 3.14159265359f
 #define Tau32 6.28318530717958647692f
+#define ScreenMetersX 30.f
+#define PixelsPerMeter 100.f
 #define Kilobytes(Value) ((Value)*1024LL)
 #define Megabytes(Value) (Kilobytes(Value)*1024LL)
 #define Gigabytes(Value) (Megabytes(Value)*1024LL)
 #define Terabytes(Value) (Gigabytes(Value)*1024LL)
 #define DegreesToRadians(Degrees) Degrees*Pi32/180.f
+#define MetersToPixels(Value) (int)(Value * PixelsPerMeter)
+#define PixelsToMeters(Value) (Value / PixelsPerMeter)
 
 #define Assert(Expression) if(!(Expression)) {*(int *)0 = 0;} // Dereference a NULL pointer
 #define ArrayCount(Array) (sizeof(Array) / sizeof((Array)[0]))

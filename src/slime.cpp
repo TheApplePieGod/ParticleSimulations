@@ -13,7 +13,7 @@ void simulation_slime::Initialize(int _agentCount, int _imageSizeX, int _imageSi
     agentData.resize(agentCount);
 
     std::array<diamond_compute_buffer_info, 1> cpBuffers {
-        diamond_compute_buffer_info("slimeAgentData", sizeof(slime_agent) * agentCount, false, true, false),
+        diamond_compute_buffer_info("slimeAgentData", sizeof(slime_agent) * agentCount, false, true),
     };
     std::array<diamond_compute_image_info, 1> cpImages {
         diamond_compute_image_info("slimeTrailMap", imageSizeX, imageSizeY, 32)
@@ -25,20 +25,12 @@ void simulation_slime::Initialize(int _agentCount, int _imageSizeX, int _imageSi
     cpCreateInfo.bufferCount = cpBuffers.size();
     cpCreateInfo.bufferInfoList = cpBuffers.data();
     cpCreateInfo.computeShaderPath = "../shaders/slime.comp.spv";
-    cpCreateInfo.groupCountX = ceil(agentCount / 64);
-    cpCreateInfo.shouldBlockCPU = true;
+    cpCreateInfo.groupCountX = ceil(agentCount / 64) + 1;
     cpCreateInfo.usePushConstants = true;
     cpCreateInfo.pushConstantsDataSize = sizeof(slime_constants);
-    cpCreateInfo.preRunSyncFlags = {
-        0, 0, VK_PIPELINE_STAGE_VERTEX_SHADER_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT
-    };
-    cpCreateInfo.postRunSyncFlags = {
-        VK_ACCESS_SHADER_WRITE_BIT, VK_ACCESS_VERTEX_ATTRIBUTE_READ_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, VK_PIPELINE_STAGE_VERTEX_INPUT_BIT
-    };
     slimeComputeIndex = Engine->CreateComputePipeline(cpCreateInfo);
 
     cpCreateInfo.bufferCount = 0;
-    cpCreateInfo.shouldBlockCPU = true;
     cpCreateInfo.computeShaderPath = "../shaders/trailmap.comp.spv";
     cpCreateInfo.groupCountX = ceil(imageSizeX / 8);
     cpCreateInfo.groupCountY = ceil(imageSizeY / 8);
@@ -62,10 +54,16 @@ void simulation_slime::Initialize(int _agentCount, int _imageSizeX, int _imageSi
 
 void simulation_slime::Run()
 {
+    Engine->BeginFrame(diamond_camera_mode::OrthographicViewportIndependent, glm::vec2(500.f, 500.f), Engine->GenerateViewMatrix(glm::vec2(0.f, 0.f)), -1);
     settings.deltaTime = Engine->FrameDelta() / 1000.0; // convert to seconds
 
-    Engine->RunComputeShader(slimeComputeIndex, settings.dirty, &settings);
-    Engine->RunComputeShader(trailmapComputeIndex, false, &settings);
+    if (settings.dirty)
+    {
+        Engine->UploadComputeData(slimeComputeIndex, 0);
+    }
+
+    Engine->RunComputeShader(slimeComputeIndex, &settings);
+    Engine->RunComputeShader(trailmapComputeIndex, &settings);
     settings.dirty = false;
 
     diamond_transform quadTransform;
