@@ -34,6 +34,7 @@ layout(set = 0, binding = 0, std430) buffer CellData
 
 #define GRAVITY_FORCE vec2(0, 9806.65)
 
+// reference: https://github.com/multiprecision/sph_vulkan/
 void main()
 {
     uint id = gl_GlobalInvocationID.x;

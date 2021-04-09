@@ -31,7 +31,9 @@ class simulation_slime
 {
 public:
     void Initialize(int agentCount, int imageSizeX, int imageSizeY);
+    void Recreate(int agentCount, int imageSizeX, int imageSizeY);
     void Run();
+    void Focus();
     void RenderGUI();
 
 private:
@@ -43,7 +45,10 @@ private:
     int imageSizeY;
     int slimeComputeIndex;
     int trailmapComputeIndex;
+    int graphicsPipelineIndex;
     int textureIndex;
+
+    bool recreate = false;
 
     void StartAgentsFromCenter();
     void StartAgentsFromOutside();

@@ -33,6 +33,7 @@ layout(set = 0, binding = 0, std430) buffer CellData
 // constants
 #define PI_FLOAT 3.1415927410125732421875f
 
+// reference: https://github.com/multiprecision/sph_vulkan/
 void main()
 {
     uint id = gl_GlobalInvocationID.x;

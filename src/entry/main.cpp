@@ -16,28 +16,16 @@ enum simulation
 
 int main(int argc, char** argv)
 {
-    simulation sim = simulation::Fluid;
+    Engine->Initialize(2560, 1440, "Particle Simulations");
+
+    simulation sim = simulation::Slime;
 
     simulation_slime* slimeSimulation = new simulation_slime();
+    slimeSimulation->Initialize(100000, 2560, 1440);
+    slimeSimulation->Focus();
+
     simulation_fluid* fluidSimulation = new simulation_fluid();
-
-    switch (sim)
-    {
-        case simulation::Slime:
-        {
-            Engine->Initialize(2560, 1440, 1000000, 50, "Particle Simulations", "../shaders/default.vert.spv", "../shaders/default.frag.spv");
-            slimeSimulation->Initialize(100000, 2560, 1440);
-        } break;
-
-        case simulation::Fluid:
-        {
-            Engine->Initialize(1000, 1000, 1000000, 50, "Particle Simulations", "../shaders/fluid.vert.spv", "../shaders/fluid.frag.spv");
-            fluidSimulation->Initialize(20000);
-        } break;
-
-        default:
-        { return 0; }
-    }
+    fluidSimulation->Initialize(20000);
 
     InputManager->Initialize();
 
@@ -60,6 +48,23 @@ int main(int argc, char** argv)
 
             default:
             {} break;
+        }
+
+        // general gui
+        if (ImGui::Begin("General Settings"))
+        {
+            if (ImGui::Button("Run Slime Simulation"))
+            {
+                slimeSimulation->Focus();
+                sim = simulation::Slime;
+            }
+            if (ImGui::Button("Run Fluid Simulation"))
+            {
+                fluidSimulation->Focus();
+                sim = simulation::Fluid;
+            }
+
+            ImGui::End();
         }
 
         Engine->EndFrame({ 0.f, 0.f, 0.f, 1.f });

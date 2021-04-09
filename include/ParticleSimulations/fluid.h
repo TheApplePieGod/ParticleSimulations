@@ -55,7 +55,9 @@ class simulation_fluid
 {
 public:
     void Initialize(int numParticles);
+    void Recreate(int numParticles);
     void Run();
+    void Focus();
     void RenderGUI();
 
 private:
@@ -63,12 +65,15 @@ private:
     std::vector<glm::vec4> forceInputs;
     fluid_constants settings;
 
-    glm::vec2 lastMousePos = glm::vec2(0.f, 0.f);
+    glm::vec2 lastMousePos = glm::vec2(INFINITY, INFINITY);
 
     int numParticles;
     int densityPressureComputeIndex;
     int forceComputeIndex;
     int integrateComputeIndex;
+    int graphicsPipelineIndex;
+
+    bool recreate = false;
 
     void FillScreen();
 };

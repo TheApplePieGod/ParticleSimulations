@@ -53,7 +53,7 @@ void main()
     blurResult = originalValue * (1 - diffuseWeight) + blurResult * diffuseWeight;
     imageStore(image, ivec2(gl_GlobalInvocationID.xy), max(vec4(0), blurResult - constants.evaporateSpeed * constants.deltaTime));
 
-    //vec3 diffusedValue = mix(originalValue, blurResult, constants.diffuseSpeed * constants.deltaTime);
-    //vec3 evaporatedValue = max(vec3(0.0), diffusedValue - constants.evaporateSpeed * constants.deltaTime);
-    //imageStore(image, ivec2(gl_GlobalInvocationID.xy), vec4(evaporatedValue, 1.0));
+    // vec4 diffusedValue = mix(originalValue, blurResult, constants.diffuseSpeed * constants.deltaTime);
+    // vec4 evaporatedValue = max(vec4(0.0), diffusedValue - constants.evaporateSpeed * constants.deltaTime);
+    // imageStore(image, ivec2(gl_GlobalInvocationID.xy), evaporatedValue);
 }

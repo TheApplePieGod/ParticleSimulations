@@ -7,9 +7,7 @@ extern diamond* Engine;
 extern input_manager* InputManager;
 
 void simulation_fluid::Initialize(int _numParticles)
-{
-    Engine->UpdateVertexStructInfo(sizeof(fluid_particle), VK_PRIMITIVE_TOPOLOGY_POINT_LIST, fluid_particle::GetAttributeDescriptions, fluid_particle::GetBindingDescription);
-
+{    
     numParticles = _numParticles;
 
     particleData.resize(numParticles);
@@ -20,7 +18,6 @@ void simulation_fluid::Initialize(int _numParticles)
         diamond_compute_buffer_info("fluidForceInputs", sizeof(glm::vec4) * numParticles, false, true)
     };
     diamond_compute_pipeline_create_info cpCreateInfo = {};
-    cpCreateInfo.enabled = true;
     cpCreateInfo.bufferCount = cpBuffers.size();
     cpCreateInfo.bufferInfoList = cpBuffers.data();
     cpCreateInfo.computeShaderPath = "../shaders/fluid_compute_density_pressure.comp.spv";
@@ -34,6 +31,17 @@ void simulation_fluid::Initialize(int _numParticles)
 
     cpCreateInfo.computeShaderPath = "../shaders/fluid_integrate.comp.spv";
     integrateComputeIndex = Engine->CreateComputePipeline(cpCreateInfo);
+
+    diamond_graphics_pipeline_create_info gpCreateInfo = {};
+    gpCreateInfo.vertexShaderPath = "../shaders/fluid.vert.spv";
+    gpCreateInfo.fragmentShaderPath = "../shaders/fluid.frag.spv";
+    gpCreateInfo.maxVertexCount = numParticles;
+    gpCreateInfo.maxIndexCount = 1;
+    gpCreateInfo.vertexSize = sizeof(fluid_particle);
+    gpCreateInfo.vertexTopology = VK_PRIMITIVE_TOPOLOGY_POINT_LIST;
+    gpCreateInfo.getVertexAttributeDescriptions = fluid_particle::GetAttributeDescriptions;
+    gpCreateInfo.getVertexBindingDescription = fluid_particle::GetBindingDescription;
+    graphicsPipelineIndex = Engine->CreateGraphicsPipeline(gpCreateInfo);
 
     FillScreen();
 
@@ -49,15 +57,35 @@ void simulation_fluid::Initialize(int _numParticles)
     settings.dirty = true;
 }
 
+void simulation_fluid::Recreate(int _numParticles)
+{
+    Engine->DeleteComputePipeline(densityPressureComputeIndex);
+    Engine->DeleteComputePipeline(forceComputeIndex);
+    Engine->DeleteComputePipeline(integrateComputeIndex);
+    Engine->DeleteGraphicsPipeline(graphicsPipelineIndex);
+
+    Initialize(_numParticles);
+}
+
 void simulation_fluid::Run()
 {
-    Engine->BeginFrame(diamond_camera_mode::OrthographicViewportIndependent, glm::vec2(500.f, 500.f), Engine->GenerateViewMatrix(glm::vec2(0.f, 0.f)), densityPressureComputeIndex, 0);
+    if (recreate)
+    {
+        recreate = false;
+        Recreate(numParticles);
+    }
+
+    Engine->BeginFrame(diamond_camera_mode::OrthographicViewportIndependent, glm::vec2(1.f, -1.f), Engine->GenerateViewMatrix(glm::vec2(0.f, 0.f)));
     settings.deltaTime = Engine->FrameDelta() / 1000.0; // convert to seconds
+
+    Engine->SetGraphicsPipeline(graphicsPipelineIndex);
 
     if (settings.dirty)
     {
-        Engine->MapComputeData(densityPressureComputeIndex, 0, 0, sizeof(fluid_particle) * numParticles, particleData.data()); // map inital data
+        Engine->MapComputeData(densityPressureComputeIndex, 0, 0, sizeof(fluid_particle) * settings.numParticles, particleData.data()); // map inital data
+        Engine->MapComputeData(densityPressureComputeIndex, 1, 0, sizeof(glm::vec4) * settings.numParticles, forceInputs.data()); // map inital data
         Engine->UploadComputeData(densityPressureComputeIndex, 0);
+        Engine->UploadComputeData(densityPressureComputeIndex, 1);
     }
     
     Engine->RunComputeShader(densityPressureComputeIndex, &settings);
@@ -65,16 +93,16 @@ void simulation_fluid::Run()
 
     if (InputManager->IsMouseDown(1))
     { 
-        Engine->RetrieveComputeData(integrateComputeIndex, 0, 0, sizeof(fluid_particle) * numParticles, particleData.data());
+        Engine->RetrieveComputeData(integrateComputeIndex, 0, 0, sizeof(fluid_particle) * settings.numParticles, particleData.data());
 
         glm::vec2 mousePos = InputManager->GetMouseScreenPosition();
-        if (lastMousePos != mousePos)
+        if (lastMousePos.x != INFINITY && lastMousePos != mousePos)
         {
-            glm::vec2 trajectory = glm::normalize(mousePos - lastMousePos);
+            glm::vec2 trajectory = mousePos - lastMousePos; //glm::normalize(mousePos - lastMousePos);
             lastMousePos = mousePos;
 
             glm::vec2 localMousePos = (mousePos / Engine->GetWindowSize()) * 2.f - 1.f;
-            f32 scalar = 100000000.f * settings.dragSpeed;
+            f32 scalar = 10000000.f * settings.dragSpeed;
             for (int i = 0; i < particleData.size(); i++)
             {
                 if (length(particleData[i].position - localMousePos) <= 0.2)
@@ -86,10 +114,14 @@ void simulation_fluid::Run()
                     forceInputs[i] = glm::vec4(0.f);
             }
         }
+        else
+            lastMousePos = mousePos;
 
-        Engine->MapComputeData(integrateComputeIndex, 1, 0, sizeof(glm::vec4) * numParticles, forceInputs.data());
+        Engine->MapComputeData(integrateComputeIndex, 1, 0, sizeof(glm::vec4) * settings.numParticles, forceInputs.data());
         Engine->UploadComputeData(integrateComputeIndex, 1);
     }
+    else
+        lastMousePos = glm::vec2(INFINITY, INFINITY);
 
     Engine->RunComputeShader(integrateComputeIndex, &settings);
 
@@ -97,7 +129,12 @@ void simulation_fluid::Run()
 
     settings.dirty = false;
 
-    Engine->DrawFromCompute(numParticles);
+    Engine->DrawFromCompute(integrateComputeIndex, 0, settings.numParticles);
+}
+
+void simulation_fluid::Focus()
+{
+    Engine->SetWindowSize(glm::vec2(1000, 1000));
 }
 
 void simulation_fluid::RenderGUI()
@@ -142,16 +179,33 @@ void simulation_fluid::RenderGUI()
             FillScreen();
         }
 
+        ImGui::Separator();
+        intMin = 0;
+        intMax = 1000000;
+        ImGui::AlignTextToFramePadding();
+        ImGui::Text("Particle Count:");
+        ImGui::SameLine();
+        ImGui::DragScalar("##ParticleCount", ImGuiDataType_S32, &numParticles, 1000, &intMin, &intMax, "%d");
+
+        ImGui::NewLine();
+
+        ImGui::Text("Click to update settings below divider");
+        if (ImGui::Button("Restart Sim"))
+        {
+            recreate = true;
+        }
+
         ImGui::End();
     }
 }
 
 void simulation_fluid::FillScreen()
 {
-    glm::vec2 startingPos = glm::vec2(-1, -1);
     f32 particleRadius = 0.005f;
+    glm::vec2 startingPos = glm::vec2(-1, -1);
     for (int i = 0; i < numParticles; i++)
     {
+        forceInputs[i] = glm::vec4(0.f);
         particleData[i].position = startingPos;
         particleData[i].velocity = glm::vec2(0.f, 0.f);
         particleData[i].force = glm::vec2(0.f, 0.f);

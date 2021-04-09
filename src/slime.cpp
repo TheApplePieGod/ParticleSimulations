@@ -19,7 +19,6 @@ void simulation_slime::Initialize(int _agentCount, int _imageSizeX, int _imageSi
         diamond_compute_image_info("slimeTrailMap", imageSizeX, imageSizeY, 32)
     };
     diamond_compute_pipeline_create_info cpCreateInfo = {};
-    cpCreateInfo.enabled = true;
     cpCreateInfo.imageCount = cpImages.size();
     cpCreateInfo.imageInfoList = cpImages.data();
     cpCreateInfo.bufferCount = cpBuffers.size();
@@ -35,6 +34,13 @@ void simulation_slime::Initialize(int _agentCount, int _imageSizeX, int _imageSi
     cpCreateInfo.groupCountX = ceil(imageSizeX / 8);
     cpCreateInfo.groupCountY = ceil(imageSizeY / 8);
     trailmapComputeIndex = Engine->CreateComputePipeline(cpCreateInfo);
+
+    diamond_graphics_pipeline_create_info gpCreateInfo = {};
+    gpCreateInfo.vertexShaderPath = "../shaders/default.vert.spv";
+    gpCreateInfo.fragmentShaderPath = "../shaders/default.frag.spv";
+    gpCreateInfo.maxVertexCount = 1000;
+    gpCreateInfo.maxIndexCount = 1000;
+    graphicsPipelineIndex = Engine->CreateGraphicsPipeline(gpCreateInfo);
 
     textureIndex = Engine->ComputePipelineFirstTextureIndex(slimeComputeIndex);
 
@@ -52,10 +58,27 @@ void simulation_slime::Initialize(int _agentCount, int _imageSizeX, int _imageSi
     settings.color = glm::vec4(1.f, 0.f, 0.f, 1.f);
 }
 
+void simulation_slime::Recreate(int _agentCount, int _imageSizeX, int _imageSizeY)
+{
+    Engine->DeleteComputePipeline(slimeComputeIndex);
+    Engine->DeleteComputePipeline(trailmapComputeIndex);
+    Engine->DeleteGraphicsPipeline(graphicsPipelineIndex);
+
+    Initialize(_agentCount, _imageSizeX, _imageSizeY);
+}
+
 void simulation_slime::Run()
 {
-    Engine->BeginFrame(diamond_camera_mode::OrthographicViewportIndependent, glm::vec2(500.f, 500.f), Engine->GenerateViewMatrix(glm::vec2(0.f, 0.f)), -1);
+    if (recreate)
+    {
+        recreate = false;
+        Recreate(agentCount, imageSizeX, imageSizeY);
+    }
+
+    Engine->BeginFrame(diamond_camera_mode::OrthographicViewportIndependent, glm::vec2(500.f, 500.f), Engine->GenerateViewMatrix(glm::vec2(0.f, 0.f)));
     settings.deltaTime = Engine->FrameDelta() / 1000.0; // convert to seconds
+
+    Engine->SetGraphicsPipeline(graphicsPipelineIndex);
 
     if (settings.dirty)
     {
@@ -70,14 +93,19 @@ void simulation_slime::Run()
     quadTransform.location = { 0.f, 0.f };
     quadTransform.rotation = 0.f;
     quadTransform.scale = { 3000.f, 3000.f };
-    Engine->DrawQuad(textureIndex, quadTransform);
+    Engine->DrawQuad(graphicsPipelineIndex, textureIndex, quadTransform);
+}
+
+void simulation_slime::Focus()
+{
+    Engine->SetWindowSize(glm::vec2(imageSizeX, imageSizeY));
 }
 
 void simulation_slime::RenderGUI()
 {
-    if (ImGui::Begin("Agent Settings"));
+    if (ImGui::Begin("Slime Settings"));
     {
-        ImGui::Text("Agent Count: %d", settings.numAgents);
+        ImGui::Text("Real Agent Count: %d", settings.numAgents);
 
         ImGui::AlignTextToFramePadding();
         ImGui::Text("Evaporate Speed:");
@@ -131,6 +159,22 @@ void simulation_slime::RenderGUI()
         {
             settings.dirty = true;
             StartAgentsFromOutside();
+        }
+
+        ImGui::Separator();
+        intMin = 0;
+        intMax = 1000000;
+        ImGui::AlignTextToFramePadding();
+        ImGui::Text("Agent Count:");
+        ImGui::SameLine();
+        ImGui::DragScalar("##AgentCount", ImGuiDataType_S32, &agentCount, 1000, &intMin, &intMax, "%d");
+
+        ImGui::NewLine();
+
+        ImGui::Text("Click to update settings below divider");
+        if (ImGui::Button("Restart Sim"))
+        {
+            recreate = true;
         }
 
         ImGui::End();

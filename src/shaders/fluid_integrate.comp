@@ -35,6 +35,7 @@ layout(set = 0, binding = 1, std430) buffer ForceInputs
     vec4 forces[];
 } inputs;
 
+// reference: https://github.com/multiprecision/sph_vulkan/
 void main()
 {
     uint id = gl_GlobalInvocationID.x;
@@ -84,21 +85,6 @@ void main()
         newPosition.y -= finalMovement.y;
         newVelocity.y *= -1 * constants.wallDamping;
     }
-
-    // bool inY = newPosition.y < 0.5 && newPosition.y > 0.4;
-    // bool inX = newPosition.x < 0.5 && newPosition.x > -0.5;
-    // if (inY && inX)
-    // {
-    //     newPosition.y = data.cells[id].position.y;
-    //     newVelocity.y *= -1 * constants.wallDamping;
-    //     newPosition.x = data.cells[id].position.x;
-    //     newVelocity.x *= -1 * constants.wallDamping;
-    // }
-    // if ()
-    // {
-    //     newPosition.x = data.cells[id].position.x;
-    //     newVelocity.x *= -1 * constants.wallDamping;
-    // }
 
     data.cells[id].velocity = newVelocity;
     data.cells[id].position = newPosition;
