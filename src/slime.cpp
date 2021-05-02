@@ -1,6 +1,6 @@
 #include <ParticleSimulations/slime.h>
 #include <Diamond/diamond.h>
-#include <imgui.h>
+#include <imgui/imgui.h>
 
 extern diamond* Engine;
 
@@ -42,7 +42,7 @@ void simulation_slime::Initialize(int _agentCount, int _imageSizeX, int _imageSi
     gpCreateInfo.maxIndexCount = 1000;
     graphicsPipelineIndex = Engine->CreateGraphicsPipeline(gpCreateInfo);
 
-    textureIndex = Engine->ComputePipelineFirstTextureIndex(slimeComputeIndex);
+    textureIndex = Engine->GetComputeTextureIndex(slimeComputeIndex, 0);
 
     StartAgentsFromOutside();
 
@@ -93,7 +93,7 @@ void simulation_slime::Run()
     quadTransform.location = { 0.f, 0.f };
     quadTransform.rotation = 0.f;
     quadTransform.scale = { 3000.f, 3000.f };
-    Engine->DrawQuad(graphicsPipelineIndex, textureIndex, quadTransform);
+    Engine->DrawQuad(textureIndex, quadTransform);
 }
 
 void simulation_slime::Focus()

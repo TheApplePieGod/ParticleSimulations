@@ -16,7 +16,7 @@ enum simulation
 
 int main(int argc, char** argv)
 {
-    Engine->Initialize(2560, 1440, "Particle Simulations");
+    Engine->Initialize(2560, 1440, "Particle Simulations", "../images/default-texture.png");
 
     simulation sim = simulation::Slime;
 

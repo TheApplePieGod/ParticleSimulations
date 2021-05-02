@@ -1,7 +1,7 @@
 #include <ParticleSimulations/fluid.h>
 #include <ParticleSimulations/input.h>
 #include <Diamond/diamond.h>
-#include <imgui.h>
+#include <imgui/imgui.h>
 
 extern diamond* Engine;
 extern input_manager* InputManager;
