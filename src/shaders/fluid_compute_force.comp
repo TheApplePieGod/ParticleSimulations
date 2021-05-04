@@ -1,0 +1,67 @@
+#version 450
+
+layout(local_size_x = 64, local_size_y = 1, local_size_z = 1) in;
+
+struct cell
+{
+    vec2 position;
+    vec2 velocity;
+    vec2 force;
+    float density;
+    float pressure;
+};
+
+layout(push_constant) uniform PushConstants {
+    int numParticles;
+    float viscosity;
+    float mass;
+    float radius;
+    float wallDamping;
+    float density;
+    float stiffness;
+    float deltaTime;
+    float dragSpeed;
+    int colliderIndex;
+    bool dirty;
+} constants;
+
+layout(set = 0, binding = 0, std430) buffer CellData
+{
+    cell cells[];
+} data;
+
+#define PI_FLOAT 3.1415927410125732421875f
+
+#define GRAVITY_FORCE vec2(0, 9806.65)
+
+// reference: https://github.com/multiprecision/sph_vulkan/
+void main()
+{
+    uint id = gl_GlobalInvocationID.x;
+    if (id >= constants.numParticles) return;
+
+    // compute all forces
+    vec2 pressureForce = vec2(0.0, 0.0);
+    vec2 viscosityForce = vec2(0.0, 0.0);
+    float SMOOTHING_LENGTH = constants.radius * 4.0;
+
+    float pressureConstant = -45.0 / (PI_FLOAT * pow(SMOOTHING_LENGTH, 6));
+    float viscosityConstant = -1 * pressureConstant;
+    for (uint i = 0; i < constants.numParticles; i++)
+    {
+        if (i == id) continue;
+        vec2 delta = data.cells[id].position - data.cells[i].position;
+        float dist = length(delta);
+        if (dist < SMOOTHING_LENGTH)
+        {
+            pressureForce -= constants.mass * (data.cells[id].pressure + data.cells[i].pressure) / (2.f * data.cells[i].density) * pressureConstant * pow(SMOOTHING_LENGTH - dist, 2) * normalize(delta);
+            viscosityForce += constants.mass * (data.cells[i].velocity - data.cells[id].velocity) / data.cells[i].density * viscosityConstant * (SMOOTHING_LENGTH - dist);
+        }
+    }
+
+    viscosityForce *= constants.viscosity;
+    vec2 externalForce = data.cells[id].density * GRAVITY_FORCE;
+
+    data.cells[id].force = pressureForce + viscosityForce + externalForce;
+    //data.cells[id].force = externalForce;
+}

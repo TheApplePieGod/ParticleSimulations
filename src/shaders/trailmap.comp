@@ -1,0 +1,59 @@
+#version 450
+
+layout(local_size_x = 8, local_size_y = 8, local_size_z = 1) in;
+
+layout(push_constant) uniform PushConstants {
+    int numAgents;
+    float moveSpeed;
+    float diffuseSpeed;
+    float evaporateSpeed;
+    float turnSpeed;
+    float sensorOffset;
+    float sensorAngle;
+    int sensorSize;
+    float deltaTime;
+    bool dirty;
+    vec2 padding;
+    vec4 color;
+} constants;
+
+layout(set = 0, binding = 0, rgba32f) uniform image2D image;
+
+void main()
+{  
+    uvec2 size = uvec2(imageSize(image));
+    if (gl_GlobalInvocationID.x < 0 || gl_GlobalInvocationID.x >= size.x || gl_GlobalInvocationID.y < 0 || gl_GlobalInvocationID.y >= size.y) return;
+
+    if (constants.dirty)
+    {
+        imageStore(image, ivec2(gl_GlobalInvocationID.xy), vec4(0));
+        return;
+    }
+
+    vec4 originalValue = imageLoad(image, ivec2(gl_GlobalInvocationID.xy));
+
+    // simulate blur
+    vec4 sum = vec4(0);
+    for (int offsetX = -1; offsetX <= 1; offsetX++)
+    {
+        for (int offsetY = -1; offsetY <= 1; offsetY++)
+        {
+            uint sampleX = gl_GlobalInvocationID.x + offsetX;
+            uint sampleY = gl_GlobalInvocationID.y + offsetY;
+
+            if (sampleX >= 0 && sampleX < size.x && sampleY >= 0 && sampleY < size.y)
+            {
+                sum += imageLoad(image, ivec2(sampleX, sampleY));
+            }
+        }
+    }
+    vec4 blurResult = sum / 9.0;
+
+    float diffuseWeight = clamp(constants.diffuseSpeed * constants.deltaTime, 0.0, 1.0);
+    blurResult = originalValue * (1 - diffuseWeight) + blurResult * diffuseWeight;
+    imageStore(image, ivec2(gl_GlobalInvocationID.xy), max(vec4(0), blurResult - constants.evaporateSpeed * constants.deltaTime));
+
+    // vec4 diffusedValue = mix(originalValue, blurResult, constants.diffuseSpeed * constants.deltaTime);
+    // vec4 evaporatedValue = max(vec4(0.0), diffusedValue - constants.evaporateSpeed * constants.deltaTime);
+    // imageStore(image, ivec2(gl_GlobalInvocationID.xy), evaporatedValue);
+}
