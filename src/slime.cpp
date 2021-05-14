@@ -75,8 +75,10 @@ void simulation_slime::Run()
         Recreate(agentCount, imageSizeX, imageSizeY);
     }
 
-    Engine->BeginFrame(diamond_camera_mode::OrthographicViewportIndependent, glm::vec2(500.f, 500.f), Engine->GenerateViewMatrix(glm::vec2(0.f, 0.f)));
-    settings.deltaTime = Engine->FrameDelta() / 1000.0; // convert to seconds
+    Engine->BeginFrame();
+    Engine->UpdateCameraViewMode(diamond_camera_mode::OrthographicViewportIndependent, glm::vec2(500.f, 500.f)); // do every frame to account for screen resizes
+    Engine->SetCameraViewMatrix(Engine->GenerateViewMatrix(glm::vec2(0.f, 0.f)));
+    settings.deltaTime = Engine->FrameDeltaRaw() / 1000.0; // convert to seconds
 
     Engine->SetGraphicsPipeline(graphicsPipelineIndex);
 
